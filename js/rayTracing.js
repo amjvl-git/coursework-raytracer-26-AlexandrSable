@@ -53,6 +53,7 @@ export class hitResult
         this.position = position
         this.normal = normal
         this.dist = dist
+        this.sphereIndex = -1
         this.mat = mat
     }
 }
@@ -119,6 +120,10 @@ export function drawFrame(){
             const pixel = hit.hit
                 ? (() => {
                     const lightDir = lightPos.minus(hit.position).normalised();
+
+                    const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.001)), lightDir);
+                    const shadowHit = CalculateRayCollision(shadowRay);
+
                     const baseColor = hit.mat.color.scale(1 / 255); // convert to 0..1 range
 
                     const viewDir = rayDir.scale(-1);
@@ -132,7 +137,7 @@ export function drawFrame(){
                     const specularFactor = Math.pow(Math.max(0, viewDir.dot(reflectDir)), Math.max(1, hit.mat.speculars || 10));
                     const specularColor = new Vec3(1, 1, 1).scale(specularFactor);
 
-                    const finalColor = ambient.add(diffuseColor).add(specularColor);
+                    const finalColor = ambient.add(diffuseColor).add(specularColor).multiply(shadowHit.hit && hit.sphereIndex != shadowHit.sphereIndex ? new Vec3(0.5, 0.5, 0.5) : new Vec3(1, 1, 1));
 
                     const r = Math.round(clamp(finalColor.x, 0, 1) * 255);
                     const g = Math.round(clamp(finalColor.y, 0, 1) * 255);
