@@ -1,9 +1,15 @@
 import { Vec3 } from "./mathLib.js"
-import { packRGBA, clamp } from "./mathLib.js";
-import { RBuffer32, canvasWidth , canvasHeight } from "./main.js";
+import { packRGBA, clamp, sampleHemisphereCosine } from "./mathLib.js";
+import { RBuffer32, canvasWidth , canvasHeight, accumulationBuffer, sampleCount, maxBounces } from "./main.js";
 
 export function clearBuffer(){
     RBuffer32.fill(0);
+}
+
+export function clearAccumulationBuffer(){
+    for (let i = 0; i < accumulationBuffer.length; i++) {
+        accumulationBuffer[i] = new Vec3(0, 0, 0);
+    }
 }
 
 export class material
@@ -27,12 +33,37 @@ export class Sphere
     }
 }
 
-const spheres = new Array(
+const simpleSpheres = new Array(
     // color, emission, roughness (unused), specular exponent, glass
     new Sphere(new Vec3(0, 0, -1),      0.3,    new material(new Vec3(255,0,0), 0, 50, 0)),
     new Sphere(new Vec3(-1, 0.2, -0.8),  0.15,   new material(new Vec3(0,0,255), 0, 10, 0)), 
-    new Sphere(new Vec3(0,-900000.5, -1),  900000, new material(new Vec3(0,255,0), 0, 0, 0))   
+    new Sphere(new Vec3(0,-900000.5, -1),  900000, new material(new Vec3(0,255,0), 0, 0, 0)),
+    new Sphere(new Vec3(2, 1, -1), 0.1, new material(new Vec3(255,255,255), 10, 0, 0)) // light
 );
+
+const cornellSpheres = new Array(
+    // Floor
+    //new Sphere(new Vec3(0, -3.01, 0), 2.9, new material(new Vec3(255,255,255), 4, 0, 0)),
+    // Ceiling (emissive)
+    new Sphere(new Vec3(0, 3.01, 0), 2.9, new material(new Vec3(200,200,200), 0, 0, 0)),
+    // Left wall (red)
+    new Sphere(new Vec3(-3.01, 0, 0), 2.9, new material(new Vec3(255,100,100), 0, 0, 0)),
+    // Right wall (green) 
+    new Sphere(new Vec3(3.01, 0, 0), 2.9, new material(new Vec3(100,255,100), 0, 0, 0)),
+    // Back sphere (white)
+    new Sphere(new Vec3(0, 0, -1), 1.5, new material(new Vec3(255,255,255), 0, 0, 0)),
+
+    // Left front sphere (red)
+    new Sphere(new Vec3(0, 0, 0.6), 0.05, new material(new Vec3(210,210,210), 0, 0, 0)),
+    // Left small sphere (blue)
+    new Sphere(new Vec3(-0.06, -0.03, 0.65), 0.02, new material(new Vec3(0,150,210), 0, 0.1, 0)),
+);
+
+let spheres = simpleSpheres;
+
+export function setPathTracingScene(isPathTracing) {
+    spheres = isPathTracing ? cornellSpheres : simpleSpheres;
+}
 
 
 // Ray which has an origin and direction, both are Vec3s
@@ -154,6 +185,75 @@ export function drawFrame(){
                 })();
 
             RBuffer32[y * canvasWidth + x] = pixel;
+        }
+    }
+}
+
+function tracePath(ray, depth = 0) {
+    // Accumulate radiance and throughput across bounces
+    let throughput = new Vec3(1, 1, 1);
+    let radiance = new Vec3(0, 0, 0);
+    let currentRay = ray;
+
+    for (let bounce = 0; bounce < maxBounces; bounce++) {
+        const hit = CalculateRayCollision(currentRay);
+        
+        if (!hit.hit) {
+            // No hit: black environment
+            break;
+        }
+
+        // Get material
+        const matColor = hit.mat.color.scale(1/255); // 0-1 range
+        const emission = hit.mat.emission;
+
+        // Add emissive contribution
+        if (emission > 0) {
+            radiance = radiance.add(throughput.multiply(matColor.scale(emission / 5)));
+            break; // Stop at light source
+        }
+
+        // Add direct lighting (simplified: assume point light from ceiling)
+        const lightPos = new Vec3(0, 0.99, 0);
+        const toLight = lightPos.minus(hit.position).normalised();
+        const directBright = Math.max(0, hit.normal.dot(toLight)) * 0.5 + 0.3;
+        radiance = radiance.add(throughput.multiply(matColor.scale(directBright)));
+
+        // Sample next direction (cosine-weighted hemisphere)
+        const nextDir = sampleHemisphereCosine(hit.normal);
+        const nextOrigin = hit.position.add(hit.normal.scale(0.001));
+        
+        currentRay = new Ray(nextOrigin, nextDir);
+        throughput = throughput.multiply(matColor); // Update throughput
+    }
+
+    return radiance;
+}
+
+export function drawPathTracingFrame(){
+    // Camera positioned inside the Cornell box, looking inward
+    const aspect = canvasWidth / canvasHeight;
+    const cameraPos = new Vec3(0, 0, 0.8);
+
+    for(let y = 0; y < canvasHeight; y++)
+    {
+        for(let x = 0; x < canvasWidth; x++)
+        {
+            const u = ((x + Math.random()) / canvasWidth * 2 - 1) * aspect; // jitter for anti-aliasing
+            const v = 1 - ((y + Math.random()) / canvasHeight * 2);
+
+            const rayDir = new Vec3(u, v, -1).normalised();
+            const color = tracePath(new Ray(cameraPos, rayDir));
+
+            accumulationBuffer[y * canvasWidth + x] = accumulationBuffer[y * canvasWidth + x].add(color);
+
+            const avgColor = accumulationBuffer[y * canvasWidth + x].scale(1 / sampleCount);
+
+            const r = Math.round(clamp(avgColor.x, 0, 1) * 255);
+            const g = Math.round(clamp(avgColor.y, 0, 1) * 255);
+            const b = Math.round(clamp(avgColor.z, 0, 1) * 255);
+
+            RBuffer32[y * canvasWidth + x] = packRGBA(r, g, b, 255);
         }
     }
 }
