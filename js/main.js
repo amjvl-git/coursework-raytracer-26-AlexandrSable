@@ -12,8 +12,8 @@ export const RBuffer32 = new Uint32Array(img.data.buffer);
 
 export let accumulationBuffer = new Array(canvasWidth * canvasHeight).fill().map(() => new Vec3(0, 0, 0));
 export let sampleCount = 0;
-export let pathTracingEnabled = false;
-export let maxBounces = 10;
+export let pathTracingEnabled = true;
+export let maxBounces = 1;
 
 const toggle = document.getElementById("pathTracingToggle");
 toggle.addEventListener("change", () => {

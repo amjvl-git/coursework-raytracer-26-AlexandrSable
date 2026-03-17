@@ -45,13 +45,15 @@ const cornellSpheres = new Array(
     // Floor
     //new Sphere(new Vec3(0, -3.01, 0), 2.9, new material(new Vec3(255,255,255), 4, 0, 0)),
     // Ceiling (emissive)
-    new Sphere(new Vec3(0, 3.01, 0), 2.9, new material(new Vec3(200,200,200), 0, 0, 0)),
+    new Sphere(new Vec3(0, 100003, 0), 100000, new material(new Vec3(200,200,200), 0, 0, 0)),
     // Left wall (red)
-    new Sphere(new Vec3(-3.01, 0, 0), 2.9, new material(new Vec3(255,100,100), 0, 0, 0)),
+    new Sphere(new Vec3(-100003, 0, 0), 100000, new material(new Vec3(255,100,100), 0, 0, 0)),
     // Right wall (green) 
-    new Sphere(new Vec3(3.01, 0, 0), 2.9, new material(new Vec3(100,255,100), 0, 0, 0)),
+    new Sphere(new Vec3(100003, 0, 0), 100000, new material(new Vec3(100,255,100), 0, 0, 0)),
     // Back sphere (white)
-    new Sphere(new Vec3(0, 0, -1), 1.5, new material(new Vec3(255,255,255), 0, 0, 0)),
+    new Sphere(new Vec3(0, 0, -100003), 100000, new material(new Vec3(255,255,255), 0, 0, 0)),
+    // Floor sphere (white)
+    new Sphere(new Vec3(0, -100003, 0), 100000, new material(new Vec3(255,255,255), 0, 0, 0)),
 
     // Left front sphere (red)
     new Sphere(new Vec3(0, 0, 0.6), 0.05, new material(new Vec3(210,210,210), 0, 0, 0)),
@@ -59,7 +61,7 @@ const cornellSpheres = new Array(
     new Sphere(new Vec3(-0.06, -0.03, 0.65), 0.02, new material(new Vec3(0,150,210), 0, 0.1, 0)),
 );
 
-let spheres = simpleSpheres;
+let spheres = cornellSpheres;
 
 export function setPathTracingScene(isPathTracing) {
     spheres = isPathTracing ? cornellSpheres : simpleSpheres;
@@ -233,7 +235,7 @@ function tracePath(ray, depth = 0) {
 export function drawPathTracingFrame(){
     // Camera positioned inside the Cornell box, looking inward
     const aspect = canvasWidth / canvasHeight;
-    const cameraPos = new Vec3(0, 0, 0.8);
+    const cameraPos = new Vec3(0, 0, 1.0);
 
     for(let y = 0; y < canvasHeight; y++)
     {
