@@ -8,3 +8,4 @@ Coursework - JavaScript Ray Tracing
 Use the controls on the left to adjust rendering settings and see the changes. Lower the resolution = faster rendering.
 Also incudes inplemented Path Tracing which only looks good with Conrell Box scene.
 Note that Path tracing can be computationally expensive, especially at higher resolutions and bounce counts. Also Path Tracing accumulates samples over time between different frames for better image quality (so give it some time for better results).
+I have also included a few screenshots of code working on my machine
