@@ -40,8 +40,13 @@
             </div>
 
             <div class="control-group">
-                <label for="myRange">Value: <span id="demo"></span></label>
-                <input type="range" min="1" max="100" value="50" class="slider" id="myRange">
+                <label>Light Position:</label>
+                <label>X: <span id="lightXValue">2.0</span></label>
+                <input type="range" min="-5" max="5" step="0.1" value="2" id="lightXSlider">
+                <label>Y: <span id="lightYValue">1.0</span></label>
+                <input type="range" min="-5" max="5" step="0.1" value="1" id="lightYSlider">
+                <label>Z: <span id="lightZValue">-1.0</span></label>
+                <input type="range" min="-5" max="5" step="0.1" value="-1" id="lightZSlider">
             </div>
         </aside>
 
@@ -51,7 +56,12 @@
 
         <aside class="panel panel-right">
             <h2>Info</h2>
-            <p>Additional information can go here (render stats, controls, etc.).</p>
+            <p>Made by Alexandr Soboliev</p>
+            <p>Student ID: P2916014</p>
+            <p>Coursework - JavaScript Ray Tracing</p>
+            <p>Use the controls on the left to adjust rendering settings and see the changes. Lower the resolution = faster rendering. </p>
+            <p>Also incudes inplemented Path Tracing which only looks good with Conrell Box scene. </p>
+            <p>Note that Path tracing can be computationally expensive, especially at higher resolutions and bounce counts. Also Path Tracing accumulates samples over time between different frames for better image quality (so give it some time for better results). </p>
         </aside>
     </div>
 
@@ -63,7 +73,7 @@
     html, body {
         height: 100%;
         margin: 0;
-        overflow: hidden; /* keep the viewport always visible and avoid page scroll */
+        overflow: hidden; 
         background: #1e1e2e;
         font-family: Arial, sans-serif;
         color: #eee;
@@ -79,7 +89,6 @@
         box-sizing: border-box;
     }
 
-    /* Allow grid children (panels/viewport) to shrink within the 100vh container */
     .app > * {
         min-height: 0;
     }

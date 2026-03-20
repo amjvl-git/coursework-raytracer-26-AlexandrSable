@@ -22,7 +22,7 @@ export class material
         this.glass = glass
     }
 }
-// A sphere in 3D space. Has centre, radius and colour all of which are Vec3s
+// A sphere in 3D space. That has a centre, a radius and a colour all of which are Vec3s that was implemented in mathLib.js as required by course work)
 export class Sphere
 {
     constructor (pos, rad, mat)
@@ -34,11 +34,19 @@ export class Sphere
 }
 
 const simpleSpheres = new Array(
-    // color, emission, roughness (unused), specular exponent, glass
+    // color, emission, roughness (Which is unused), specular exponent, glass
     new Sphere(new Vec3(0, 0, -1),      0.3,    new material(new Vec3(255,0,0), 0, 50, 0)),
-    new Sphere(new Vec3(-1, 0.2, -0.8),  0.15,   new material(new Vec3(0,0,255), 0, 10, 0)), 
+    new Sphere(new Vec3(0.5, 0.2, -0.8),  0.2,   new material(new Vec3(0,0,255), 0, 10, 0)), 
     new Sphere(new Vec3(0,-900000.5, -1),  900000, new material(new Vec3(0,255,0), 0, 0, 0)),
-    new Sphere(new Vec3(2, 1, -1), 0.1, new material(new Vec3(255,255,255), 10, 0, 0)) // light
+    new Sphere(new Vec3(2, 1, -1), 0.1, new material(new Vec3(255,255,255), 10, 0, 0)), // light
+    
+    // Additional small spheres
+    new Sphere(new Vec3(-0.7, -0.1, -1.2), 0.12, new material(new Vec3(255,255,0), 0, 20, 0)), // yellow
+    new Sphere(new Vec3(1.2, -0.15, -0.7), 0.08, new material(new Vec3(255,100,200), 0, 30, 0)), // pink
+    new Sphere(new Vec3(-0.3, 0.3, -0.5), 0.1, new material(new Vec3(100,255,255), 0, 25, 0)), // cyan
+    new Sphere(new Vec3(0.8, 0.35, -1.5), 0.09, new material(new Vec3(200,100,255), 0, 15, 0)), // purple
+    new Sphere(new Vec3(-1.1, 0.15, -0.9), 0.07, new material(new Vec3(255,150,50), 0, 40, 0)), // orange
+    new Sphere(new Vec3(0.2, -0.25, -1.8), 0.11, new material(new Vec3(100,200,100), 0, 12, 0)) // light green
 );
 
 const cornellSpheres = new Array(
@@ -53,20 +61,29 @@ const cornellSpheres = new Array(
     // Back sphere (white)
     new Sphere(new Vec3(0, 0, -100003), 100000, new material(new Vec3(255,255,255), 0, 0, 0)),
     // Floor sphere (white)
-    new Sphere(new Vec3(0, -100003, 0), 100000, new material(new Vec3(255,255,255), 0, 0, 0)),
+    new Sphere(new Vec3(0, -100003, 0), 100000, new material(new Vec3(210,210,210), 0, 0, 0)),
 
-    // Left front sphere (red)
-    new Sphere(new Vec3(0, 0, 0.6), 0.05, new material(new Vec3(210,210,210), 0, 0, 0)),
+    // Left front sphere (white)
+    new Sphere(new Vec3(0, 0, 0.6), 0.09, new material(new Vec3(210,210,210), 0, 0, 0)),
     // Left small sphere (blue)
-    new Sphere(new Vec3(-0.06, -0.03, 0.65), 0.02, new material(new Vec3(0,150,210), 0, 0.1, 0)),
+    new Sphere(new Vec3(-0.12, -0.04, 0.65), 0.035, new material(new Vec3(0,150,210), 0, 0.1, 0)),
+
+    new Sphere(new Vec3(0.12, 0.1, 0.65), 0.05, new material(new Vec3(210,0,0), 0, 0.1, 0)),
 );
 
 let spheres = simpleSpheres;
 let currentScene = "simple";
 
+// Light position that can be modified
+export let lightPos = new Vec3(0.5, 3.5, 1.8);
+
 export function setScene(sceneName) {
     spheres = sceneName === "cornell" ? cornellSpheres : simpleSpheres;
     currentScene = sceneName;
+}
+
+export function setLightPosition(x, y, z) {
+    lightPos = new Vec3(x, y, z);
 }
 
 
@@ -141,13 +158,13 @@ export function drawFrame(){
     const aspect = canvasWidth / canvasHeight;
     
     // Set camera and lighting based on current scene
-    let cameraPos, lightPos;
+    let cameraPos, sceneLightPos;
     if (currentScene === "cornell") {
         cameraPos = new Vec3(0, 0, 1.0);
-        lightPos = new Vec3(0, 0.99, 0);  // Ceiling light in Cornell box
+        sceneLightPos = new Vec3(0, 0.5, 0.8);  // Front light in Cornell box
     } else {
         cameraPos = new Vec3(0, 0, 0);
-        lightPos = new Vec3(5, 5, 0);  // Simple scene light
+        sceneLightPos = lightPos;  // Use the user-controlled light position
     }
 
     for(let y = 0; y < canvasHeight; y++)
@@ -162,25 +179,37 @@ export function drawFrame(){
 
             const pixel = hit.hit
                 ? (() => {
-                    const lightDir = lightPos.minus(hit.position).normalised();
+                    const lightDir = sceneLightPos.minus(hit.position).normalised();
 
-                    const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.001)), lightDir);
+                    const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.02)), lightDir);
                     const shadowHit = CalculateRayCollision(shadowRay);
 
-                    const baseColor = hit.mat.color.scale(1 / 255); // convert to 0..1 range
+                    const baseColor = hit.mat.color.scale(1 / 255); // convert to 0 to 1 range
 
                     const viewDir = rayDir.scale(-1);
                     const reflectDir = lightDir.scale(-1).add(hit.normal.scale(2 * lightDir.dot(hit.normal))).normalised();
                     
+                    // Scene-dependent lighting
+                    let ambient, specularScale;
+                    if (currentScene === "cornell") {
+                        ambient = 0.25;      // Higher ambient for Cornell box
+                        specularScale = 0.3; // Reduce specular brightness
+                    } else {
+                        ambient = 0.15;
+                        specularScale = 1.0;
+                    }
 
-                    const ambient = baseColor.scale(0.15);
+                    const ambientColor = baseColor.scale(ambient);
                     const diffuseFactor = Math.max(0, hit.normal.dot(lightDir));
                     const diffuseColor = baseColor.scale(diffuseFactor);
 
                     const specularFactor = Math.pow(Math.max(0, viewDir.dot(reflectDir)), Math.max(1, hit.mat.speculars || 10));
-                    const specularColor = new Vec3(1, 1, 1).scale(specularFactor);
+                    const specularColor = new Vec3(1, 1, 1).scale(specularFactor * specularScale);
 
-                    const finalColor = ambient.add(diffuseColor).add(specularColor).multiply(shadowHit.hit && hit.sphereIndex != shadowHit.sphereIndex ? new Vec3(0.5, 0.5, 0.5) : new Vec3(1, 1, 1));
+                    // Check if in shadow: different sphere AND hits before reaching light
+                    const lightDist = sceneLightPos.minus(hit.position).length();
+                    const inShadow = shadowHit.hit && hit.sphereIndex !== shadowHit.sphereIndex && shadowHit.dist < lightDist;
+                    const finalColor = ambientColor.add(diffuseColor).add(specularColor).multiply(inShadow ? new Vec3(0.5, 0.5, 0.5) : new Vec3(1, 1, 1));
 
                     const r = Math.round(clamp(finalColor.x, 0, 1) * 255);
                     const g = Math.round(clamp(finalColor.y, 0, 1) * 255);
@@ -208,46 +237,48 @@ function tracePath(ray, depth = 0) {
     let currentRay = ray;
 
     // Determine light position based on scene
-    const lightPos = currentScene === "cornell" 
-        ? new Vec3(0, 0.99, 0)      // Ceiling light in Cornell box
-        : new Vec3(5, 5, 0);         // Light in simple scene
+    const sceneLightPos = currentScene === "cornell" 
+        ? new Vec3(0, 0.5, 0.8)     // Front light in Cornell box
+        : lightPos;                 // Use the user-controlled light position
 
     for (let bounce = 0; bounce < maxBounces; bounce++) {
         const hit = CalculateRayCollision(currentRay);
         
         if (!hit.hit) {
-            // No hit: black environment
+            // check for no hit - returns background color
             break;
         }
 
         // Get material
-        const matColor = hit.mat.color.scale(1/255); // 0-1 range
+        const matColor = hit.mat.color.scale(1/255); // 0 to 1 range
         const emission = hit.mat.emission;
 
-        // Add emissive contribution
+        // Add emissive
         if (emission > 0) {
-            // Reduce the brightness of emissive materials so they don't blow out
+            // Reduce the brightness
             const emissionScale = 0.2;
             radiance = radiance.add(throughput.multiply(matColor.scale(emission * emissionScale)));
             break; // Stop at light source
         }
 
         // Add direct lighting
-        const toLight = lightPos.minus(hit.position);
+        const toLight = sceneLightPos.minus(hit.position);
         const lightDistSq = toLight.dot(toLight);
         const lightDist = Math.sqrt(lightDistSq);
         const lightDir = toLight.scale(1.0 / lightDist);
 
-        // Simple shadowing / occlusion
-        const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.001)), lightDir);
+        // Check if light is directly visible (test for shadows)
+        const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.02)), lightDir);
         const shadowHit = CalculateRayCollision(shadowRay);
-        const inShadow = shadowHit.hit && shadowHit.dist < lightDist - 0.001;
+        
+        // Light is blocked if a different object is between us and the light source
+        const inShadow = shadowHit.hit && hit.sphereIndex !== shadowHit.sphereIndex && shadowHit.dist < lightDist;
 
         const cosNL = Math.max(0, hit.normal.dot(lightDir));
         const lightIntensity = inShadow ? 0 : cosNL / (lightDistSq + 1e-3);
 
-        // Small ambient term so corners don't go fully black
-        const ambient = 0.05;
+        // Ambient varies by scene
+        const ambient = currentScene === "cornell" ? 0.15 : 0.05;
         const direct = ambient + lightIntensity;
 
         radiance = radiance.add(throughput.multiply(matColor.scale(direct)));
@@ -269,13 +300,13 @@ export function drawPathTracingFrame(){
     // Set camera position based on current scene
     const cameraPos = currentScene === "cornell" 
         ? new Vec3(0, 0, 1.0)       // Inside Cornell box
-        : new Vec3(0, 0, 0);         // Simple scene camera
+        : new Vec3(0, 0, 0);        // Simple scene camera
 
     for(let y = 0; y < canvasHeight; y++)
     {
         for(let x = 0; x < canvasWidth; x++)
         {
-            const u = ((x + Math.random()) / canvasWidth * 2 - 1) * aspect; // jitter for anti-aliasing
+            const u = ((x + Math.random()) / canvasWidth * 2 - 1) * aspect;
             const v = 1 - ((y + Math.random()) / canvasHeight * 2);
 
             const rayDir = new Vec3(u, v, -1).normalised();
@@ -285,7 +316,7 @@ export function drawPathTracingFrame(){
 
             const avgColor = accumulationBuffer[y * canvasWidth + x].scale(1 / sampleCount);
 
-            // Simple Reinhard tone mapping to avoid blown-out highlights
+            // Simple tone mapping
             const mapped = new Vec3(
                 avgColor.x / (avgColor.x + 1),
                 avgColor.y / (avgColor.y + 1),

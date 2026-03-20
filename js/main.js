@@ -1,10 +1,9 @@
-import { drawFrame, clearBuffer, drawPathTracingFrame, clearAccumulationBuffer, setScene } from "./rayTracing.js";
+import { drawFrame, clearBuffer, drawPathTracingFrame, clearAccumulationBuffer, setScene, setLightPosition } from "./rayTracing.js";
 import { Vec3 } from "./mathLib.js";
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d", { alpha: false });
 
-// Start with a square render resolution; this can be changed via the UI.
 export let canvasWidth = 512;
 export let canvasHeight = 512;
 
@@ -63,11 +62,37 @@ resolutionSelect.addEventListener("change", () => {
     resizeCanvas(w, h);
 });
 
-// Initialize render buffers to match the default resolution.
+// Initialize render buffers to match the default resolution
 resizeCanvas(canvasWidth, canvasHeight);
 
-// Initialize scene to match the UI defaults.
+// Initialize scene to match the UI defaults
 setScene(document.getElementById("sceneSelect").value);
+
+// Light position sliders
+const lightXSlider = document.getElementById("lightXSlider");
+const lightYSlider = document.getElementById("lightYSlider");
+const lightZSlider = document.getElementById("lightZSlider");
+const lightXValue = document.getElementById("lightXValue");
+const lightYValue = document.getElementById("lightYValue");
+const lightZValue = document.getElementById("lightZValue");
+
+function updateLightPosition() {
+    const x = parseFloat(lightXSlider.value);
+    const y = parseFloat(lightYSlider.value);
+    const z = parseFloat(lightZSlider.value);
+    
+    lightXValue.textContent = x.toFixed(1);
+    lightYValue.textContent = y.toFixed(1);
+    lightZValue.textContent = z.toFixed(1);
+    
+    setLightPosition(x, y, z);
+    sampleCount = 0;
+    clearAccumulationBuffer();
+}
+
+lightXSlider.addEventListener("input", updateLightPosition);
+lightYSlider.addEventListener("input", updateLightPosition);
+lightZSlider.addEventListener("input", updateLightPosition);
 
 function renderFrame()
 {
