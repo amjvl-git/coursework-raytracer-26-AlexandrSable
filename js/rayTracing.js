@@ -61,10 +61,12 @@ const cornellSpheres = new Array(
     new Sphere(new Vec3(-0.06, -0.03, 0.65), 0.02, new material(new Vec3(0,150,210), 0, 0.1, 0)),
 );
 
-let spheres = cornellSpheres;
+let spheres = simpleSpheres;
+let currentScene = "simple";
 
-export function setPathTracingScene(isPathTracing) {
-    spheres = isPathTracing ? cornellSpheres : simpleSpheres;
+export function setScene(sceneName) {
+    spheres = sceneName === "cornell" ? cornellSpheres : simpleSpheres;
+    currentScene = sceneName;
 }
 
 
@@ -136,9 +138,17 @@ export function CalculateRayCollision(ray)
 
 
 export function drawFrame(){
-    // Simple pinhole camera: origin at (0,0,0), looking down -Z
     const aspect = canvasWidth / canvasHeight;
-    const lightPos = new Vec3(5, 5, 0);
+    
+    // Set camera and lighting based on current scene
+    let cameraPos, lightPos;
+    if (currentScene === "cornell") {
+        cameraPos = new Vec3(0, 0, 1.0);
+        lightPos = new Vec3(0, 0.99, 0);  // Ceiling light in Cornell box
+    } else {
+        cameraPos = new Vec3(0, 0, 0);
+        lightPos = new Vec3(5, 5, 0);  // Simple scene light
+    }
 
     for(let y = 0; y < canvasHeight; y++)
     {
@@ -148,7 +158,7 @@ export function drawFrame(){
             const v = 1 - (y + 0.5) / canvasHeight * 2;
 
             const rayDir = new Vec3(u, v, -1).normalised();
-            const hit = CalculateRayCollision(new Ray(new Vec3(0, 0, 0), rayDir));
+            const hit = CalculateRayCollision(new Ray(cameraPos, rayDir));
 
             const pixel = hit.hit
                 ? (() => {
@@ -197,6 +207,11 @@ function tracePath(ray, depth = 0) {
     let radiance = new Vec3(0, 0, 0);
     let currentRay = ray;
 
+    // Determine light position based on scene
+    const lightPos = currentScene === "cornell" 
+        ? new Vec3(0, 0.99, 0)      // Ceiling light in Cornell box
+        : new Vec3(5, 5, 0);         // Light in simple scene
+
     for (let bounce = 0; bounce < maxBounces; bounce++) {
         const hit = CalculateRayCollision(currentRay);
         
@@ -211,15 +226,31 @@ function tracePath(ray, depth = 0) {
 
         // Add emissive contribution
         if (emission > 0) {
-            radiance = radiance.add(throughput.multiply(matColor.scale(emission / 5)));
+            // Reduce the brightness of emissive materials so they don't blow out
+            const emissionScale = 0.2;
+            radiance = radiance.add(throughput.multiply(matColor.scale(emission * emissionScale)));
             break; // Stop at light source
         }
 
-        // Add direct lighting (simplified: assume point light from ceiling)
-        const lightPos = new Vec3(0, 0.99, 0);
-        const toLight = lightPos.minus(hit.position).normalised();
-        const directBright = Math.max(0, hit.normal.dot(toLight)) * 0.5 + 0.3;
-        radiance = radiance.add(throughput.multiply(matColor.scale(directBright)));
+        // Add direct lighting
+        const toLight = lightPos.minus(hit.position);
+        const lightDistSq = toLight.dot(toLight);
+        const lightDist = Math.sqrt(lightDistSq);
+        const lightDir = toLight.scale(1.0 / lightDist);
+
+        // Simple shadowing / occlusion
+        const shadowRay = new Ray(hit.position.add(hit.normal.scale(0.001)), lightDir);
+        const shadowHit = CalculateRayCollision(shadowRay);
+        const inShadow = shadowHit.hit && shadowHit.dist < lightDist - 0.001;
+
+        const cosNL = Math.max(0, hit.normal.dot(lightDir));
+        const lightIntensity = inShadow ? 0 : cosNL / (lightDistSq + 1e-3);
+
+        // Small ambient term so corners don't go fully black
+        const ambient = 0.05;
+        const direct = ambient + lightIntensity;
+
+        radiance = radiance.add(throughput.multiply(matColor.scale(direct)));
 
         // Sample next direction (cosine-weighted hemisphere)
         const nextDir = sampleHemisphereCosine(hit.normal);
@@ -233,9 +264,12 @@ function tracePath(ray, depth = 0) {
 }
 
 export function drawPathTracingFrame(){
-    // Camera positioned inside the Cornell box, looking inward
     const aspect = canvasWidth / canvasHeight;
-    const cameraPos = new Vec3(0, 0, 1.0);
+    
+    // Set camera position based on current scene
+    const cameraPos = currentScene === "cornell" 
+        ? new Vec3(0, 0, 1.0)       // Inside Cornell box
+        : new Vec3(0, 0, 0);         // Simple scene camera
 
     for(let y = 0; y < canvasHeight; y++)
     {
@@ -251,9 +285,16 @@ export function drawPathTracingFrame(){
 
             const avgColor = accumulationBuffer[y * canvasWidth + x].scale(1 / sampleCount);
 
-            const r = Math.round(clamp(avgColor.x, 0, 1) * 255);
-            const g = Math.round(clamp(avgColor.y, 0, 1) * 255);
-            const b = Math.round(clamp(avgColor.z, 0, 1) * 255);
+            // Simple Reinhard tone mapping to avoid blown-out highlights
+            const mapped = new Vec3(
+                avgColor.x / (avgColor.x + 1),
+                avgColor.y / (avgColor.y + 1),
+                avgColor.z / (avgColor.z + 1)
+            );
+
+            const r = Math.round(clamp(mapped.x, 0, 1) * 255);
+            const g = Math.round(clamp(mapped.y, 0, 1) * 255);
+            const b = Math.round(clamp(mapped.z, 0, 1) * 255);
 
             RBuffer32[y * canvasWidth + x] = packRGBA(r, g, b, 255);
         }
